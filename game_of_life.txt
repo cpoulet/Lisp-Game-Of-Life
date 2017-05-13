@@ -1,0 +1,10 @@
+usage:
+	sbcl --load game_of_life.lsp [-h] width height
+
+positional arguments:
+	width				width of the grid
+
+	height				height of the grid
+
+optional arguments:
+	-h, --help show this help message and exit
