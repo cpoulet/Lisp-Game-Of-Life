@@ -6,7 +6,6 @@
 
 (ql:quickload 'lispbuilder-sdl)
 
-(defparameter *random-color* sdl:*white*)
 (defparameter *matrix* nil)
 (defparameter *matrix_h* 50)
 (defparameter *matrix_w* 100)
@@ -18,6 +17,7 @@
 (defparameter *running* nil)
 (defparameter *counter* 0)
 (defparameter *slowdown* 10)
+(defparameter *grille* 1)
 
 (defun init-cells ()
   (setq *matrix* (make-array (list *matrix_h* *matrix_w*))))
@@ -110,8 +110,8 @@
 (defun draw-life (i j)
   (sdl:draw-box
 	(sdl:rectangle
-	  :x (floor (+ *matrix-y* (+ j (* j *square*))))
-	  :y (floor (+ *matrix-x* (+ i (* i *square*))))
+	  :x (floor (+ *matrix-y* (+ (* j *grille*) (* j *square*))))
+	  :y (floor (+ *matrix-x* (+ (* i *grille*) (* i *square*))))
 	  :w (floor *square*)
 	  :h (floor *square*))
 	:color (sdl:color
@@ -123,6 +123,15 @@
   (dotimes (i *matrix_h*)
 	(dotimes (j *matrix_w*)
 	  (draw-life i j))))
+
+(defun resetgrid ()
+  (dotimes (i *matrix_h*)
+	(dotimes (j *matrix_w*)
+	  (setf *matrix-x* 0)
+	  (setf *matrix-y* 0)
+	  (setf *square* 10)
+	  (setf *running* nil)
+	  (setf (aref *matrix* i j) 0))))
 
 (defun get-val (i j)
   (if (or (< i 0) (< j 0) (>= i *matrix_h*) (>= j *matrix_w*))
@@ -168,7 +177,7 @@
 	  (setf (aref *matrix* i j) (life-rules (aref *matrix* i j) (get-neighbour i j))))) *matrix*)
 
 (defun cycle ()
-  (loop-life) ;Fonction d'affichage
+  (loop-life)
   (sdl:update-display)
   (sdl:clear-display
    (sdl:color
@@ -187,10 +196,10 @@
   )
 
 (defun size-x ()
-  (+ (* *square* *matrix_h*) (- *matrix_h* 1)))
+  (+ (* *square* *matrix_h*) (* *grille* (- *matrix_h* 1))))
 
 (defun size-y ()
-  (+ (* *square* *matrix_w*) (- *matrix_w* 1)))
+  (+ (* *square* *matrix_w*) (* *grille* (- *matrix_w* 1))))
 
 (defun get-i (x size)
   (floor (* (/ (- x *matrix-x*) size) *matrix_h*)))
@@ -209,14 +218,36 @@
 (defun zoom()
   (if (>= *square* 40)
 	'0
-	(setf *square* (+ *square* 2))))
+	(setf *square* (+ *square* 1))))
 
 (defun unzoom()
   (if (<= *square* 2)
 	'0
-	(setf *square* (- *square* 2))))
+	(setf *square* (- *square* 1))))
 
-(defun draw-a-box-in-window ()
+(defun speedup()
+  (if (< 0 *slowdown*)
+    (decf *slowdown*)))
+
+(defun slowdown()
+  (if (> 50 *slowdown*)
+    (incf *slowdown*)))
+
+(defun zoom_mouse(mx my)
+  (let ((sx (size-x))(sy (size-y)))
+	(zoom)
+  	(let ((nsx (size-x))(nsy (size-y)))
+	  (setf *matrix-y* (floor(- mx (* nsx (/ sx (- mx *matrix-y*))))))
+	  (setf *matrix-x* (floor(- my (* nsy (/ sy (- my *matrix-x*)))))))))
+	
+(defun unzoom_mouse(mx my)
+  (let ((sx (size-x))(sy (size-y)))
+	(unzoom)
+  	(let ((nsx (size-x))(nsy (size-y)))
+	  (setf *matrix-y* (floor(- mx (* nsx (/ sx (- mx *matrix-y*))))))
+	  (setf *matrix-x* (floor(- my (* nsy (/ sy (- my *matrix-x*)))))))))
+
+  (defun draw-a-box-in-window ()
   (sdl:with-init ()
     (sdl:window *win-w* *win-h*)
     (setf (sdl:frame-rate) 60)
@@ -243,23 +274,35 @@
             (setf *running* nil)
             (setf *running* t)))
         (when (sdl:key-down-p :sdl-key-comma)
-          (incf *slowdown*))
+          (slowdown))
         (when (sdl:key-down-p :sdl-key-period)
-          (if (< 0 *slowdown*)
-            (decf *slowdown*)))
+          (speedup))
 		(when (sdl:key-down-p :sdl-key-kp-plus)
-		  (zoom))
+		  (progn (zoom_mouse (sdl:mouse-x) (sdl:mouse-y)) (zoom_mouse (sdl:mouse-x) (sdl:mouse-y))))
 		(when (sdl:key-down-p :sdl-key-kp-minus)
-		  (unzoom)))
+		  (progn (unzoom_mouse (sdl:mouse-x) (sdl:mouse-y)) (unzoom_mouse (sdl:mouse-x) (sdl:mouse-y))))
+		(when (sdl:key-down-p :sdl-key-r)
+		  (resetgrid))
+		(when (sdl:key-down-p :sdl-key-g)
+		 (setf *grille* (- 1 *grille*))
+		 (if (= *grille* 1) (setf *square*  (- *square* 1)) (setf *square* (+ *square* 1)))))
 	  (:mouse-button-up-event (:button button :x mouse-x :y mouse-y)
-		(if (and (= button 1) *running*)
-		  (touch mouse-y mouse-x)
-		  (touch mouse-y mouse-x)) ;drag and drop
-		(if (= button 4)
-		  (unzoom))
-		(if (= button 5)
-		  (zoom)))
+		(if (and (= button 1) (not  (sdl:key-down-p :sdl-key-lshift)))
+          (touch mouse-y mouse-x))
+        (if (= button 4)
+           (if (or (sdl:key-down-p :sdl-key-lshift) (sdl:key-down-p :sdl-key-rshift))
+                (speedup)
+		        (progn (unzoom_mouse mouse-x mouse-y) (unzoom_mouse mouse-x mouse-y))))
+         (if (= button 5)
+            (if (or (sdl:key-down-p :sdl-key-lshift) (sdl:key-down-p :sdl-key-rshift))
+                (slowdown)
+		  		(progn (zoom_mouse mouse-x mouse-y) (zoom_mouse mouse-x mouse-y)))))
       (:idle ()
+			(when (and (sdl:mouse-left-p) (or (sdl:key-down-p :sdl-key-lshift) (sdl:key-down-p :sdl-key-rshift)))
+               (let ((relative-pos (sdl:mouse-relative-position)))
+                 (setf *matrix-x* (+ *matrix-x* (aref relative-pos 1)))
+                 (setf *matrix-y* (+ *matrix-y* (aref relative-pos 0)))
+                 ))
              (cycle)
              ))))
 
