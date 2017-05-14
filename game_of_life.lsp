@@ -15,6 +15,9 @@
 (defparameter *win-w* 1500)
 (defparameter *win-h* 800)
 (defparameter *square* 10)
+(defparameter *running* nil)
+(defparameter *counter* 0)
+(defparameter *slowdown* 10)
 
 (defun init-cells ()
   (setq *matrix* (make-array (list *matrix_h* *matrix_w*))))
@@ -168,12 +171,20 @@
   (loop-life) ;Fonction d'affichage
   (sdl:update-display)
   (sdl:clear-display
-	(sdl:color
-	  :r 127
-	  :g 127
-	  :b 127))
-  (walk)
-  (god))
+   (sdl:color
+    :r 127
+    :g 127
+    :b 127))
+  (if (>= *counter* *slowdown*)
+      (progn
+        (setf *counter* 0)
+        (if *running*
+            (progn
+              (walk)
+              (god))))
+      )
+  (incf *counter*)
+  )
 
 (defun size-x ()
   (+ (* *square* *matrix_h*) (- *matrix_h* 1)))
@@ -195,6 +206,16 @@
 								  '1))
   	  'nil)))
 
+(defun zoom()
+  (if (>= *square* 40)
+	'0
+	(setf *square* (+ *square* 2))))
+
+(defun unzoom()
+  (if (<= *square* 2)
+	'0
+	(setf *square* (- *square* 2))))
+
 (defun draw-a-box-in-window ()
   (sdl:with-init ()
     (sdl:window *win-w* *win-h*)
@@ -208,27 +229,38 @@
       (:quit-event () t)
       (:key-down-event ()
         (when (or (sdl:key-down-p :sdl-key-q) (sdl:key-down-p :sdl-key-escape))
-          (sdl:push-quit-event)))
+          (sdl:push-quit-event))
+        (when (or (sdl:key-down-p :sdl-key-down) (sdl:key-down-p :sdl-key-s))
+		  (setf *matrix-x* (+ *matrix-x* *square*)))
+        (when (or (sdl:key-down-p :sdl-key-up) (sdl:key-down-p :sdl-key-w))
+		  (setf *matrix-x* (- *matrix-x* *square*)))
+        (when (or (sdl:key-down-p :sdl-key-left) (sdl:key-down-p :sdl-key-a))
+		  (setf *matrix-y* (- *matrix-y* *square*)))
+        (when (or (sdl:key-down-p :sdl-key-right) (sdl:key-down-p :sdl-key-d))
+		  (setf *matrix-y* (+ *matrix-y* *square*)))
+		(when (sdl:key-down-p :sdl-key-p)
+          (if *running*
+            (setf *running* nil)
+            (setf *running* t)))
+        (when (sdl:key-down-p :sdl-key-comma)
+          (incf *slowdown*))
+        (when (sdl:key-down-p :sdl-key-period)
+          (if (< 0 *slowdown*)
+            (decf *slowdown*)))
+		(when (sdl:key-down-p :sdl-key-kp-plus)
+		  (zoom))
+		(when (sdl:key-down-p :sdl-key-kp-minus)
+		  (unzoom)))
+	  (:mouse-button-up-event (:button button :x mouse-x :y mouse-y)
+		(if (and (= button 1) *running*)
+		  (touch mouse-y mouse-x)
+		  (touch mouse-y mouse-x)) ;drag and drop
+		(if (= button 4)
+		  (unzoom))
+		(if (= button 5)
+		  (zoom)))
       (:idle ()
              (cycle)
-        	 (when (or (sdl:key-down-p :sdl-key-down) (sdl:key-down-p :sdl-key-s))
-			   (setf *matrix-x* (+ *matrix-x* *square*)))
-        	 (when (or (sdl:key-down-p :sdl-key-up) (sdl:key-down-p :sdl-key-w))
-			   (setf *matrix-x* (- *matrix-x* *square*)))
-        	 (when (or (sdl:key-down-p :sdl-key-left) (sdl:key-down-p :sdl-key-a))
-			   (setf *matrix-y* (- *matrix-y* *square*)))
-        	 (when (or (sdl:key-down-p :sdl-key-right) (sdl:key-down-p :sdl-key-d))
-			   (setf *matrix-y* (+ *matrix-y* *square*)))
-			 (when (sdl:key-down-p :sdl-key-kp-plus)
-			   (if (>= *square* 40)
-				 '0
-			     (setf *square* (+ 2 *square*))))
-			 (when (sdl:key-down-p :sdl-key-kp-minus)
-			   (if (<= *square* 2)
-				 '0
-			     (setf *square* (- *square* 2))))
-        	 (when (sdl:mouse-left-p)
-			   (touch (sdl:mouse-y) (sdl:mouse-x)))
              ))))
 
 (defun main (argv &aux (argc (length argv)))
