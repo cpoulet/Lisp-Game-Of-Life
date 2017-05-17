@@ -19,3 +19,14 @@ My Simulation in Lisp
 ======
 
 [![Game_of_life.gif](https://s10.postimg.org/acpyxo0q1/Game_of_life.gif)](https://postimg.org/image/j7qt86pid/)
+
+Infomations
+======
+
+All the compilation information are described in the [PDF](Game_of_life.pdf)
+
+I am using SDL for graphical part.  
+
+Usage: game_of_life --load width height  
+         width: width of the grid   
+         height: height of the grid
